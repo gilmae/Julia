@@ -1,6 +1,6 @@
 # Mandelbrot
 
-A program that generates images of the Julia set.
+A program that generates images of the [Julia set](https://en.m.wikipedia.org/wiki/Julia_set).
 
 ## Usage
 ```
