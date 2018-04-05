@@ -4,11 +4,12 @@ import (
     "fmt"
     "math/cmplx"
     "strconv"
-    "math"
     "math/rand"
+    //"math"
     "time"
     "flag"
     "sync"
+    "github.com/gilmae/rescale"
     //"sort"
 )
 
@@ -19,15 +20,6 @@ var height int = 1600
 var x int = 0
 var y int = 0
 
-var default_gradient string = `[["0.0", "000764"],["0.16", "026bcb"],["0.42", "edffff"],["0.6425", "ffaa00"],["0.8675", "000200"],["1.0","000764"]]`
-
-type Point struct {
-   C complex128
-   X int
-   Y int
-   Escape float64
-}
-
 type Key struct {
     x, y int
 }
@@ -35,57 +27,63 @@ type Key struct {
 var points_map map[Key]Point
 
 const (
-    rMin   = -2.25
-    rMax   = 0.75
-    iMin   = -1.5
-    iMax   = 1.5
-    usage  = "mandelbot OPTIONS\n\nPlots the mandelbrot set, centered at a point indicated by the provided real and imaginary, and at the given zoom level.\n\nSaves the output into the given path.\n\n"
+  rMin   = -1.5
+  rMax   = 1.5
+  iMin   = -1.5
+  iMax   = 1.5
+  usage  = "mandelbot OPTIONS\n\nPlots the mandelbrot set, centered at a point indicated by the provided real and imaginary, and at the given zoom level.\n\nSaves the output into the given path.\n\n"
+  default_gradient  = `[["0.0", "000764"],["0.16", "026bcb"],["0.42", "edffff"],["0.6425", "ffaa00"],["0.8675", "000200"],["1.0","000764"]]`
 )
 
-func calculate_escape(c complex128, add_smoothing_jitter bool) float64 {
-  iteration := 0.0
-
-  var z complex128
-  for z= c;cmplx.Abs(z) < bailout && iteration < maxIterations; iteration+=1 {
+func calculate_escape( p Point, c complex128) Point {
+  var iteration float64
+  var z complex128 = p.C
+  
+  for iteration = 0.0;cmplx.Abs(z) < bailout && iteration < maxIterations; iteration+=1 {
     z = z*z+c;
   }
 
   if (iteration >= maxIterations) {
-    return maxIterations
+    return Point{p.C, p.X, p.Y, maxIterations, z, p.ConstantPoint, false}
   }
-
-  if (add_smoothing_jitter) {
-    z = z*z+c
-    z = z*z+c
-    iteration += 2
-    reZ := real(z)
-    imZ := imag(z)
-    magnitude := math.Sqrt(reZ * reZ + imZ * imZ)
-    mu := iteration + 1 - (math.Log(math.Log(magnitude)))/math.Log(2.0)
-    return mu
-  }
-  return iteration
+  
+  return Point{p.C, p.X, p.Y, iteration, z, p.ConstantPoint, true}
 }
 
-func plot(midX float64, midY float64, scale float64, width int, height int, calculated chan Point, add_smoothing_jitter bool) {
+func plot(c complex128, midX float64, midY float64, zoom float64, width int, height int, calculated chan Point) {
   points := make(chan Point, 64)
 
   // spawn four worker goroutines
   var wg sync.WaitGroup
-  for i := 0; i < 4; i++ {
+  for i := 0; i < 100; i++ {
     wg.Add(1)
     go func() {
       for p := range points {
-        p.Escape = calculate_escape(p.C, add_smoothing_jitter)
-        calculated <- p
+        calculated <- calculate_escape(p, c)
       }
       wg.Done()
     }()
   }
 
+  // Derive new bounds based on focal point and zoom
+  new_r_start, new_r_end := rescale.Get_Zoomed_Bounds(rMin, rMax, midX, zoom)
+  new_i_start, new_i_end := rescale.Get_Zoomed_Bounds(iMin, iMax, midY, zoom)
+
+
+  // Pregenerate all the values of the x  & Y CoOrdinates
+  xCoOrds := make([]float64, width)
+  for i,_ := range xCoOrds {
+    xCoOrds[i] = rescale.Rescale(new_r_start, new_r_end, width, i);
+  }
+
+  yCoOrds := make([]float64, height)
+  for i,_ := range yCoOrds {
+    yCoOrds[height-i-1] = rescale.Rescale(new_i_start, new_i_end, height, i);
+  }
+
   for x:=0; x < width; x += 1 {
-    for y:=0; y < height; y += 1 {
-      points <- Point{get_cordinates(midX, midY, scale, width, height, x, y),x,y, 0}
+    for y:=height-1; y >= 0; y -= 1 {
+      points <- Point{complex(xCoOrds[x], yCoOrds[y]),x,y, 0, complex(0,0), c, false}
     }
   }
 
@@ -94,19 +92,23 @@ func plot(midX float64, midY float64, scale float64, width int, height int, calc
   wg.Wait()
 }
 
-func get_cordinates(midX float64, midY float64, scale float64, width int, height int, x int, y int) complex128 {
-  return complex(float64(x - width/2)/scale + midX, float64((height-y) - height/2)/scale+midY)
+func get_cordinates(midX float64, midY float64, zoom float64, width int, height int, x int, y int) complex128 {
+  new_r_start, new_r_end := rescale.Get_Zoomed_Bounds(rMin, rMax, midX, zoom)
+  scaled_r := rescale.Rescale(new_r_start, new_r_end, width, x)
+
+  new_i_start, new_i_end := rescale.Get_Zoomed_Bounds(iMin, iMax, midY, zoom)
+  scaled_i := rescale.Rescale(new_i_start, new_i_end, height, height-y)
+
+  return complex(scaled_r, scaled_i)
 }
-
-
-
-
-
+    
 func main() {
   //start := time.Now()
 
   var midX float64
   var midY float64
+  var cr float64
+  var ci float64
   var zoom float64
   var output string
   var filename string
@@ -114,8 +116,10 @@ func main() {
   var mode string
 
   rand.Seed(time.Now().UnixNano())
-  flag.Float64Var(&midX, "r", -0.75, "Real component of the midpoint.")
+  flag.Float64Var(&midX, "r", 0.0, "Real component of the midpoint.")
   flag.Float64Var(&midY, "i", 0.0, "Imaginary component of the midpoint.")
+  flag.Float64Var(&cr, "cr", 0.0, "Real component of the c constant.")
+  flag.Float64Var(&ci, "ci", 0.0, "Imaginary component of the c constant.")
   flag.Float64Var(&zoom, "z", 1, "Zoom level.")
   flag.StringVar(&output, "o", ".", "Output path.")
   flag.StringVar(&filename, "f", "", "Output file name.")
@@ -125,15 +129,10 @@ func main() {
   flag.IntVar(&height, "h", 1600, "Height of render.")
   flag.Float64Var(&maxIterations, "m", 2000.0, "Maximum Iterations before giving up on finding an escape.")
   flag.StringVar(&gradient, "g", default_gradient, "Gradient to use.")
-  flag.StringVar(&mode, "mode", "image", "Mode: edge, image, coordsAt")
+  flag.StringVar(&mode, "mode", "image", "Mode: image, coordsAt")
   flag.IntVar(&x, "x", 0, "x cordinate of a pixel, used for translating to the real component. 0,0 is top left.")
   flag.IntVar(&y, "y", 0, "y cordinate of a pixel, used for translating to the real component. 0,0 is top left.")
   flag.Parse()
-
-
-  scale := (float64(width) / (rMax - rMin))
-  scale = scale * zoom
-
 
   points_map = make(map[Key]Point)
 
@@ -147,49 +146,18 @@ func main() {
 
   
   if (mode == "image") {
-    plot(midX, midY, scale, width, height, calculatedChan, mode=="image" && colour_mode=="smooth")
+    plot(complex(cr,ci),midX, midY, zoom, width, height, calculatedChan)
     if (filename == "") {
-      filename = "mb_" + strconv.FormatFloat(midX, 'E', -1, 64) + "_" + strconv.FormatFloat(midY, 'E', -1, 64) + "_" +  strconv.FormatFloat(zoom, 'E', -1, 64) + ".jpg"
+      filename = "julia_c_" +strconv.FormatFloat(cr, 'E', -1, 64) + "+ " + strconv.FormatFloat(ci, 'E', -1, 64) + "i_" + strconv.FormatFloat(midX, 'E', -1, 64) + "_" + strconv.FormatFloat(midY, 'E', -1, 64) + "_" +  strconv.FormatFloat(zoom, 'E', -1, 64) + ".jpg"
     }
 
     filename = output + "/" + filename
 
-    draw_image(filename, points_map, width, height, gradient)
+    draw_image(filename, points_map, width, height, gradient, mode=="image" && colour_mode=="smooth")
     fmt.Printf("%s\n", filename)
-  } else if (mode == "edge") {
-    plot(midX, midY, scale, width, height, calculatedChan, mode=="image" && colour_mode=="smooth")
-    var edgePoints = make(chan Point)
-
-    var found_edges []Point = make([]Point, 0)
-
-    go func(edge<-chan Point) {
-      for p := range edge {
-        found_edges = append(found_edges, p)
-      }
-    }(edgePoints)
-
-    find_edges(edgePoints)
-
-    if (len(found_edges) == 0) {
-      return
-    }
-
-    var index = int(rand.Float64() * float64(len(found_edges)))
-
-    var p = found_edges[index].C
-    fmt.Printf("%18.17e, %18.17e\n", real(p), imag(p))
-  } else if (mode == "raw") {
-    plot(midX, midY, scale, width, height, calculatedChan, mode=="image" && colour_mode=="smooth")
-    
-    if (filename == "") {
-      filename = "/mb_" + strconv.FormatFloat(midX, 'E', -1, 64) + "_" + strconv.FormatFloat(midY, 'E', -1, 64) + "_" +  strconv.FormatFloat(zoom, 'E', -1, 64) + ".json"
-    }
-
-    filename = output + "/" + filename
-
-    write_raw(points_map, filename)
   } else if (mode == "coordsAt") {
-    var p = get_cordinates(midX, midY, scale, width, height, x, y)
+    
+    var p = get_cordinates(midX, midY, zoom, width, height, x, y)
     fmt.Printf("%18.17e, %18.17e\n", real(p), imag(p))
   }
 }

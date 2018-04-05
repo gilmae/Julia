@@ -9,6 +9,7 @@ import (
   "github.com/gilmae/interpolation"
   "encoding/json"
   "encoding/hex"
+  "math"
   "os"
   "strconv"
 
@@ -97,7 +98,18 @@ func get_colour(esc float64) color.NRGBA {
 
 }
 
-func draw_image(filename string, plot_map map[Key]Point, width int, height int, gradient string){
+func add_jitter(p Point) Point {
+    z := p.FinalZ*p.FinalZ*p.ConstantPoint
+    z = z*z*p.ConstantPoint
+    iteration := p.Escape
+    reZ := real(z)
+    imZ := imag(z)
+    magnitude := math.Sqrt(reZ * reZ + imZ * imZ)
+    mu := iteration + 1 - (math.Log(math.Log(magnitude)))/math.Log(2.0)
+    return Point{p.C, p.X, p.Y, mu, p.FinalZ, p.ConstantPoint, p.Escaped}
+}
+
+func draw_image(filename string, plot_map map[Key]Point, width int, height int, gradient string, requires_jitter bool){
   build_gradient(gradient)
   fill_palette()
 
@@ -109,7 +121,14 @@ func draw_image(filename string, plot_map map[Key]Point, width int, height int, 
   for x:=0; x < width; x += 1 {
     for y:=0; y < height; y += 1 {
       var p = plot_map[Key{x,y}]
-      b.Set(p.X, p.Y, get_colour(p.Escape))
+      if (requires_jitter && p.Escaped) {
+        newP := add_jitter(p)
+        b.Set(p.X, p.Y, get_colour(newP.Escape))
+      } else {
+        b.Set(p.X, p.Y, get_colour(p.Escape))
+      }
+    
+      
     }
   }
 
