@@ -35,12 +35,20 @@ const (
   default_gradient  = `[["0.0", "000764"],["0.16", "026bcb"],["0.42", "edffff"],["0.6425", "ffaa00"],["0.8675", "000200"],["1.0","000764"]]`
 )
 
-func calculate_escape( p Point, c complex128) Point {
+func pow(x complex128, y int) complex128 {
+  result := x
+  for iteration := 0; iteration < y-1; iteration++ {
+    result = result * x;
+  }
+  return result;
+}
+
+func calculate_escape(p Point, c complex128, exponent int) Point {
   var iteration float64
   var z complex128 = p.C
   
   for iteration = 0.0;cmplx.Abs(z) < bailout && iteration < maxIterations; iteration+=1 {
-    z = z*z+c;
+    z = pow(z, exponent)+c;
   }
 
   if (iteration >= maxIterations) {
@@ -50,7 +58,7 @@ func calculate_escape( p Point, c complex128) Point {
   return Point{p.C, p.X, p.Y, iteration, z, p.ConstantPoint, true}
 }
 
-func plot(c complex128, midX float64, midY float64, zoom float64, width int, height int, calculated chan Point) {
+func plot(c complex128, midX float64, midY float64, zoom float64, width int, height int, exponent int, calculated chan Point) {
   points := make(chan Point, 64)
 
   // spawn four worker goroutines
@@ -59,7 +67,7 @@ func plot(c complex128, midX float64, midY float64, zoom float64, width int, hei
     wg.Add(1)
     go func() {
       for p := range points {
-        calculated <- calculate_escape(p, c)
+        calculated <- calculate_escape(p, c, exponent)
       }
       wg.Done()
     }()
@@ -113,6 +121,7 @@ func main() {
   var output string
   var filename string
   var gradient string
+  var exponent int
   var mode string
 
   rand.Seed(time.Now().UnixNano())
@@ -120,6 +129,7 @@ func main() {
   flag.Float64Var(&midY, "i", 0.0, "Imaginary component of the midpoint.")
   flag.Float64Var(&cr, "cr", 0.0, "Real component of the c constant.")
   flag.Float64Var(&ci, "ci", 0.0, "Imaginary component of the c constant.")
+  flag.IntVar(&exponent, "e", 2, "The exponent to raise z to.")
   flag.Float64Var(&zoom, "z", 1, "Zoom level.")
   flag.StringVar(&output, "o", ".", "Output path.")
   flag.StringVar(&filename, "f", "", "Output file name.")
@@ -146,7 +156,7 @@ func main() {
 
   
   if (mode == "image") {
-    plot(complex(cr,ci),midX, midY, zoom, width, height, calculatedChan)
+    plot(complex(cr,ci),midX, midY, zoom, width, height, exponent, calculatedChan)
     if (filename == "") {
       filename = "julia_c_" +strconv.FormatFloat(cr, 'E', -1, 64) + "+ " + strconv.FormatFloat(ci, 'E', -1, 64) + "i_" + strconv.FormatFloat(midX, 'E', -1, 64) + "_" + strconv.FormatFloat(midY, 'E', -1, 64) + "_" +  strconv.FormatFloat(zoom, 'E', -1, 64) + ".jpg"
     }

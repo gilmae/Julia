@@ -12,7 +12,6 @@ import (
   "math"
   "os"
   "strconv"
-
 )
 
 var xSequence []float64
@@ -78,16 +77,19 @@ func get_colour(esc float64) color.NRGBA {
 
     return color.NRGBA{uint8(redpoint), uint8(greenpoint), uint8(bluepoint), 255}
   } else if (colour_mode == "smooth") {
-    clr1 := int(esc)
-    t2 :=  esc - float64(clr1);
+    index1 := int(math.Abs(esc))
+    t2 :=  esc - float64(index1);
     t1 := 1 - t2;
 
-    clr1 = clr1 % len(palette)
-    clr2 := (clr1 + 1) % len(palette)
+    index1 = index1 % len(palette)
+    index2 := (index1 + 1) % len(palette)
 
-    r := float64(palette[clr1].R) * t1 + float64(palette[clr2].R) * t2
-    g := float64(palette[clr1].G) * t1 + float64(palette[clr2].G) * t2
-    b := float64(palette[clr1].B) * t1 + float64(palette[clr2].B) * t2
+    clr1 := palette[index1]
+    clr2 := palette[index2]
+
+    r := float64(clr1.R) * t1 + float64(clr2.R) * t2
+    g := float64(clr1.G) * t1 + float64(clr2.G) * t2
+    b := float64(clr1.B) * t1 + float64(clr2.B) * t2
 
     return color.NRGBA{uint8(r),uint8(g),uint8(b),255};
   } else if (colour_mode == "banded") {
@@ -121,7 +123,10 @@ func draw_image(filename string, plot_map map[Key]Point, width int, height int, 
   for x:=0; x < width; x += 1 {
     for y:=0; y < height; y += 1 {
       var p = plot_map[Key{x,y}]
-      if (requires_jitter && p.Escaped) {
+        if (!p.Escaped){
+          b.Set(p.X, p.Y, color.NRGBA{0, 0, 0, 255})
+
+        } else if (requires_jitter) {
         newP := add_jitter(p)
         b.Set(p.X, p.Y, get_colour(newP.Escape))
       } else {
