@@ -1,15 +1,19 @@
 # Mandelbrot
 
-A program that generates images of the Mandelbrot set.
+A program that generates images of the Julia set.
 
 ## Usage
 ```
-mandelbrot OPTIONS
+julia OPTIONS
 
 -b float
     Bailout value. (default 4)
 -c string
     Colour mode: true, smooth, banded, none. (default "none")
+-ci float
+    Imaginary component of the c constant
+-cr float
+    Real component of the c constant
 -f string
     Output file name.
 -g string
@@ -17,13 +21,13 @@ mandelbrot OPTIONS
 -h int
     Height of render. (default 1600)
 -i float
-    Imaginary component of the midpoint.
+    Imaginary component of the focal point.
 -m float
     Maximum Iterations before giving up on finding an escape. (default 2000)
 -o string
     Output path. (default ".")
 -r float
-    Real component of the midpoint. (default -0.75)
+    Real component of the focal point. (default -0.75)
 -w int
     Width of render. (default 1600)
 -z float
