@@ -74,8 +74,8 @@ func plot(c complex128, midX float64, midY float64, zoom float64, width int, hei
   }
 
   // Derive new bounds based on focal point and zoom
-  new_r_start, new_r_end := rescale.Get_Zoomed_Bounds(rMin, rMax, midX, zoom)
-  new_i_start, new_i_end := rescale.Get_Zoomed_Bounds(iMin, iMax, midY, zoom)
+  new_r_start, new_r_end := rescale.GetZoomedBounds(rMin, rMax, midX, zoom)
+  new_i_start, new_i_end := rescale.GetZoomedBounds(iMin, iMax, midY, zoom)
 
 
   // Pregenerate all the values of the x  & Y CoOrdinates
@@ -101,10 +101,10 @@ func plot(c complex128, midX float64, midY float64, zoom float64, width int, hei
 }
 
 func get_cordinates(midX float64, midY float64, zoom float64, width int, height int, x int, y int) complex128 {
-  new_r_start, new_r_end := rescale.Get_Zoomed_Bounds(rMin, rMax, midX, zoom)
+  new_r_start, new_r_end := rescale.GetZoomedBounds(rMin, rMax, midX, zoom)
   scaled_r := rescale.Rescale(new_r_start, new_r_end, width, x)
 
-  new_i_start, new_i_end := rescale.Get_Zoomed_Bounds(iMin, iMax, midY, zoom)
+  new_i_start, new_i_end := rescale.GetZoomedBounds(iMin, iMax, midY, zoom)
   scaled_i := rescale.Rescale(new_i_start, new_i_end, height, height-y)
 
   return complex(scaled_r, scaled_i)
