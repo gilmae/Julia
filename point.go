@@ -6,6 +6,5 @@ type Point struct {
 	Y int
 	Escape float64
 	FinalZ complex128
-	ConstantPoint complex128
 	Escaped bool
  }
