@@ -7,6 +7,7 @@ import (
   "image/draw"
   "image/jpeg"
   "github.com/gilmae/interpolation"
+  "github.com/gilmae/fractal"
   "encoding/json"
   "encoding/hex"
   "math"
@@ -97,21 +98,9 @@ func get_colour(esc float64) color.NRGBA {
   } else {
     return color.NRGBA{255, 255, 255, 255};
   }
-
 }
 
-func add_jitter(p Point) Point {
-    z := p.FinalZ*p.FinalZ*p.ConstantPoint
-    z = z*z*p.ConstantPoint
-    iteration := p.Escape +2
-    reZ := real(z)
-    imZ := imag(z)
-    magnitude := math.Sqrt(reZ * reZ + imZ * imZ)
-    mu := iteration + 1 - (math.Log(math.Log(magnitude)))/math.Log(2.0)
-    return Point{p.C, p.X, p.Y, mu, p.FinalZ, p.ConstantPoint, p.Escaped}
-}
-
-func draw_image(filename string, plot_map map[Key]Point, width int, height int, gradient string, requires_jitter bool){
+func draw_image(filename string, plot_map map[fractal.Key]fractal.Point, width int, height int, gradient string){
   build_gradient(gradient)
   fill_palette()
 
@@ -122,16 +111,13 @@ func draw_image(filename string, plot_map map[Key]Point, width int, height int, 
 
   for x:=0; x < width; x += 1 {
     for y:=0; y < height; y += 1 {
-      var p = plot_map[Key{x,y}]
+      var p = plot_map[fractal.Key{x,y}]
         if (!p.Escaped){
           b.Set(p.X, p.Y, color.NRGBA{0, 0, 0, 255})
 
-        } else if (requires_jitter) {
-        newP := add_jitter(p)
-        b.Set(p.X, p.Y, get_colour(newP.Escape))
-      } else {
-        b.Set(p.X, p.Y, get_colour(p.Escape))
-      }
+        } else {
+          b.Set(p.X, p.Y, get_colour(p.Escape))
+        }
     
       
     }
