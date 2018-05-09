@@ -103,7 +103,7 @@ func get_colour(esc float64) color.NRGBA {
 func add_jitter(p Point) Point {
     z := p.FinalZ*p.FinalZ*p.ConstantPoint
     z = z*z*p.ConstantPoint
-    iteration := p.Escape
+    iteration := p.Escape +2
     reZ := real(z)
     imZ := imag(z)
     magnitude := math.Sqrt(reZ * reZ + imZ * imZ)
