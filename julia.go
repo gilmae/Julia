@@ -9,6 +9,7 @@ import (
     "time"
     "flag"
     "github.com/gilmae/rescale"
+    "github.com/gilmae/fractal"
     //"sort"
 )
 
@@ -18,12 +19,6 @@ var  width int = 1600
 var height int = 1600
 var x int = 0
 var y int = 0
-
-type Key struct {
-    x, y int
-}
-
-var points_map map[Key]Point
 
 const (
   rMin   = -1.5
@@ -35,6 +30,13 @@ const (
 )
 
 
+func pow(x complex128, y int) complex128 {
+	result := x
+	for iteration := 0; iteration < y-1; iteration++ {
+	  result = result * x;
+	}
+	return result;
+}
 
 func get_cordinates(midX float64, midY float64, zoom float64, width int, height int, x int, y int) complex128 {
   new_r_start, new_r_end := rescale.GetZoomedBounds(rMin, rMax, midX, zoom)
@@ -82,7 +84,7 @@ func main() {
   flag.IntVar(&y, "y", 0, "y cordinate of a pixel, used for translating to the real component. 0,0 is top left.")
   flag.Parse()
 
-  var calculator EscapeCalculator = func(z complex128) (float64, complex128, bool) {
+  var calculator fractal.EscapeCalculator = func(z complex128) (float64, complex128, bool) {
       var iteration float64
       var c complex128 = complex(cr,ci)
       
@@ -93,9 +95,7 @@ func main() {
       if (iteration >= maxIterations) {
         return maxIterations, z, false
       }
-
-  
-
+      if (mode=="image" && colour_mode=="smooth") {
       z = z*z+c
       z = z*z+c
       iteration += 2
@@ -105,9 +105,14 @@ func main() {
       mu := iteration + 1 - (math.Log(math.Log(magnitude)))/math.Log(2.0)
       
       return mu, z, true
+      }
+      
+      return iteration, z, true
   }
 
-  var points_map = escape_time_calculator(midX, midY, zoom, width, height, calculator);
+  base := fractal.Base{rMin, rMax, iMin, iMax}
+
+  var points_map = fractal.Escape_Time_Calculator(base, midX, midY, zoom, width, height, calculator);
   
   if (mode == "image") {
     if (filename == "") {
@@ -116,7 +121,7 @@ func main() {
 
     filename = output + "/" + filename
 
-    draw_image(filename, points_map, width, height, gradient, mode=="image" && colour_mode=="smooth")
+    draw_image(filename, points_map, width, height, gradient)
     fmt.Printf("%s\n", filename)
   } else if (mode == "coordsAt") {
     
